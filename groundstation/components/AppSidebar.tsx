@@ -16,7 +16,8 @@ import {
   Radio, 
   Settings, 
   FileText, 
-  Plane 
+  Plane, 
+  Logs
 } from "lucide-react"
 
 // Menu items.
@@ -30,7 +31,13 @@ const items = [
     title: "Map",
     url: "/map",
     icon: Radio,
+
   },
+  {
+    title:"Logs",
+    url:"/logs",
+    icon: Logs,
+  }
 ]
 
 export function AppSidebar() {
