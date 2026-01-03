@@ -4,13 +4,14 @@
   "main": "signalling_server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start":"node signalling_server.js"
+    "start": "node signalling_server.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "dotenv": "^17.2.3",
     "express": "^5.2.1",
     "socket.io": "^4.8.3",
     "zustand": "^5.0.9"
