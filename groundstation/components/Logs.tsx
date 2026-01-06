@@ -13,6 +13,8 @@ import {
   XCircle, 
   CheckCircle2 
 } from 'lucide-react'
+import { invoke } from '@tauri-apps/api/core'
+import { open, stat } from '@tauri-apps/plugin-fs';
 
 // --- Types ---
 type LogLevel = 'INFO' | 'WARN' | 'ERROR' | 'SUCCESS';
@@ -103,6 +105,43 @@ export default function Logs() {
     }
   };
 
+  const handleExport = async () => {
+  try {
+    const path: string = await invoke('get_log_path');
+    
+    // Get file metadata to determine size
+    const fileInfo = await stat(path);
+    const fileSize = fileInfo.size;
+    
+    // Open the file in read mode
+    const file = await open(path, { read: true });
+    
+    // Allocate a buffer for the entire file
+    const buffer = new Uint8Array(fileSize);
+    
+    // Read the entire file into the buffer (single read since buffer matches size)
+    const bytesRead = await file.read(buffer);
+    
+    if (bytesRead !== fileSize) {
+      console.warn(`Expected ${fileSize} bytes, but read ${bytesRead}`);
+    }
+    
+    // Close the file handle
+    await file.close();
+    
+    // Create blob from the buffer
+    const blob = new Blob([buffer], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'mav.tlog';
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    console.error('Failed to export log:', e);
+  }
+};
+
   return (
     <div className="flex flex-col h-full w-full bg-slate-950 text-slate-200 font-mono rounded-lg border border-slate-800 shadow-xl overflow-hidden">
       
@@ -160,7 +199,10 @@ export default function Logs() {
           >
             <Trash2 size={14} /> Clear
           </button>
-          <button className="flex items-center gap-1 hover:text-green-400 transition-colors">
+          <button 
+            onClick={handleExport}
+            className="flex items-center gap-1 hover:text-green-400 transition-colors"
+          >
             <Download size={14} /> Export
           </button>
         </div>

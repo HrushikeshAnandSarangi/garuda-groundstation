@@ -23,3 +23,13 @@ serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
 tauri = { version = "2.9.5", features = [] }
 tauri-plugin-log = "2"
+mavlink = "0.15.0"
+tokio = {version = "1.49.0",features = ["full"] }
+srt-tokio = { git = "https://github.com/russelltg/srt-rs.git" }
+tokio-tungstenite = "0.28.0"
+image = "0.25.6"
+h264-decoder = "0.2.4"
+yuv = "0.1.9"
+mpeg2ts-reader = "0.18.2"
+
+

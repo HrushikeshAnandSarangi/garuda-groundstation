@@ -1,66 +1,94 @@
 'use client'
-import React, { useEffect, useRef } from 'react';
-import Hls from 'hls.js';
 
-interface CameraFeedbackProps {
-  // URL of the live stream (usually ends in .m3u8)
-  // I've included a public test stream as a default
-  streamUrl?: string; 
-}
+import React, { useEffect, useRef, useState } from 'react'
+import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
 
-export default function CameraFeedback1({ 
-  streamUrl = 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8' 
-}: CameraFeedbackProps) {
-  
-  const videoRef = useRef<HTMLVideoElement>(null);
+type StreamStatus = 'connecting' | 'connected' | 'disconnected'
+
+export default function CameraFeedback1() {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const [status, setStatus] = useState<StreamStatus>('connecting')
 
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
+    const canvas = canvasRef.current
+    if (!canvas) return
 
-    // 1. Check if the browser supports Media Source Extensions (Chrome, Firefox, Edge)
-    if (Hls.isSupported()) {
-      const hls = new Hls({
-        debug: false, // Set to true to see streaming logs in console
-      });
+    const WIDTH = 1280
+    const HEIGHT = 720
 
-      hls.loadSource(streamUrl);
-      hls.attachMedia(video);
+    canvas.width = WIDTH
+    canvas.height = HEIGHT
 
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        video.play().catch(e => console.error("Auto-play blocked:", e));
-      });
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
 
-      // Cleanup: Destroy the HLS instance when component unmounts
-      return () => {
-        hls.destroy();
-      };
-    } 
-    // 2. Fallback for native HLS support (Safari usually supports this directly)
-    else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = streamUrl;
-      video.addEventListener('loadedmetadata', () => {
-        video.play().catch(e => console.error("Auto-play blocked:", e));
-      });
+    const imageData = ctx.createImageData(WIDTH, HEIGHT)
+
+    let lastFrameTs = Date.now()
+
+    // start FFmpeg stream from Rust
+    invoke('start_video_drone').catch(console.error)
+
+    // listen for raw video frames
+    const unlisten = listen<Uint8Array>('video-frame', (event) => {
+      const frame = new Uint8ClampedArray(event.payload)
+
+      if (frame.length !== WIDTH * HEIGHT * 4) return
+
+      imageData.data.set(frame)
+      ctx.putImageData(imageData, 0, 0)
+
+      lastFrameTs = Date.now()
+      setStatus('connected')
+    })
+
+    // connection watchdog
+    const watchdog = setInterval(() => {
+      if (Date.now() - lastFrameTs > 2000) {
+        setStatus('disconnected')
+      }
+    }, 500)
+
+    return () => {
+      unlisten.then(f => f())
+      clearInterval(watchdog)
     }
-  }, [streamUrl]);
+  }, [])
 
   return (
     <div className="flex flex-col items-center justify-center p-4">
       <h3 className="mb-2 text-lg font-semibold">DRONE 1</h3>
-      <div className="relative w-full max-w-2xl bg-black rounded-lg overflow-hidden shadow-lg">
-        <video
-          ref={videoRef}
-          controls
-          muted // Muted is often required for autoplay to work in modern browsers
-          playsInline
-          style={{ width: '100%', height: 'auto', display: 'block' }}
+
+      <div className="relative w-full max-w-2xl bg-black rounded-lg overflow-hidden shadow-lg text-white p-3">
+        {/* VIDEO CANVAS */}
+        <canvas
+          ref={canvasRef}
+          className="w-full rounded bg-black"
         />
-        {/* Optional: Add an overlay or recording indicator here */}
-        <div style={{ position: 'absolute', top: 10, right: 10, color: 'red', fontWeight: 'bold' }}>
-          ● LIVE
+
+        {/* STATUS BAR */}
+        <div className="mt-2 flex justify-between text-sm">
+          <span>
+            Stream:{' '}
+            <strong
+              className={
+                status === 'connected'
+                  ? 'text-green-400'
+                  : status === 'connecting'
+                  ? 'text-yellow-400'
+                  : 'text-red-400'
+              }
+            >
+              {status}
+            </strong>
+          </span>
+
+          {status === 'connected' && (
+            <span className="text-red-500 font-bold">● LIVE</span>
+          )}
         </div>
       </div>
     </div>
-  );
+  )
 }
